@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Download, Share2, RefreshCw, Clock } from 'lucide-react';
+import { Calendar, Download, Share2, RefreshCw, Clock, Cpu } from 'lucide-react';
 import { useStudyContext, DifficultyLevel } from '@/context/StudyContext';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
@@ -12,8 +12,19 @@ import { toast } from "sonner";
 
 const StudyPlan: React.FC = () => {
   const navigate = useNavigate();
-  const { studyPlan, subjects, timeSlots, goal, goalDetails, generateStudyPlan } = useStudyContext();
+  const { 
+    studyPlan, 
+    subjects, 
+    timeSlots, 
+    goal, 
+    goalDetails, 
+    generateStudyPlan, 
+    generateAIPlan, 
+    isGeneratingPlan 
+  } = useStudyContext();
+  
   const [view, setView] = useState<'week' | 'day'>('week');
+  const [regeneratingWithAI, setRegeneratingWithAI] = useState(false);
   
   // Get unique days from study plan
   const days = [...new Set(studyPlan.map(session => session.day))];
@@ -42,9 +53,21 @@ const StudyPlan: React.FC = () => {
     toast.success("Share feature will be implemented in the next version");
   };
   
-  const handleRegeneratePlan = () => {
-    generateStudyPlan();
-    toast.success("Study plan regenerated successfully");
+  const handleRegeneratePlan = async (useAI: boolean = false) => {
+    if (useAI) {
+      setRegeneratingWithAI(true);
+      try {
+        await generateAIPlan();
+        toast.success("AI study plan regenerated successfully");
+      } catch (error) {
+        console.error("Error regenerating AI plan:", error);
+      } finally {
+        setRegeneratingWithAI(false);
+      }
+    } else {
+      generateStudyPlan();
+      toast.success("Study plan regenerated successfully");
+    }
   };
   
   if (studyPlan.length === 0) {
@@ -92,8 +115,33 @@ const StudyPlan: React.FC = () => {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handleRegeneratePlan}>
-                  <RefreshCw className="h-4 w-4 mr-1" /> Regenerate
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleRegeneratePlan(true)}
+                  disabled={isGeneratingPlan || regeneratingWithAI}
+                  className="flex items-center"
+                >
+                  <Cpu className="h-4 w-4 mr-1" /> 
+                  {regeneratingWithAI ? "Regenerating..." : "AI Regenerate"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Generate a new plan using AI</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleRegeneratePlan(false)}
+                  disabled={isGeneratingPlan || regeneratingWithAI}
+                >
+                  <RefreshCw className="h-4 w-4 mr-1" /> Basic Regenerate
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -219,7 +267,12 @@ const StudyPlan: React.FC = () => {
       
       <Card>
         <CardContent className="p-6">
-          <h3 className="font-semibold mb-4">Summary</h3>
+          <h3 className="font-semibold mb-4 flex items-center">
+            <span>Study Plan Summary</span>
+            <span className="ml-2 text-xs font-normal px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full flex items-center">
+              <Cpu className="h-3 w-3 mr-1" /> AI Enhanced
+            </span>
+          </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="text-sm text-gray-500">Total Study Sessions</div>

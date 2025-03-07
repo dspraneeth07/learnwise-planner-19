@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Clock, BookOpen, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Clock, BookOpen, Sparkles, Cpu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStudyContext, Subject, TimeSlot, DifficultyLevel, StudyGoal } from '@/context/StudyContext';
 import { Button } from "@/components/ui/button";
@@ -25,7 +24,9 @@ const StudyDetailsForm: React.FC = () => {
     timeSlots,
     addTimeSlot,
     removeTimeSlot,
-    generateStudyPlan
+    generateStudyPlan,
+    generateAIPlan,
+    isGeneratingPlan
   } = useStudyContext();
 
   const [newSubject, setNewSubject] = useState({
@@ -84,7 +85,7 @@ const StudyDetailsForm: React.FC = () => {
     return hours * 60 + minutes;
   };
 
-  const handleGeneratePlan = () => {
+  const handleGeneratePlan = async (useAI: boolean = false) => {
     if (subjects.length === 0) {
       toast.error("Please add at least one subject");
       return;
@@ -95,8 +96,13 @@ const StudyDetailsForm: React.FC = () => {
       return;
     }
 
-    generateStudyPlan();
-    toast.success("Study plan generated successfully");
+    if (useAI) {
+      await generateAIPlan();
+    } else {
+      generateStudyPlan();
+      toast.success("Study plan generated successfully");
+    }
+    
     navigate('/generated-plan');
   };
 
@@ -344,13 +350,22 @@ const StudyDetailsForm: React.FC = () => {
           </Card>
         </section>
 
-        <div className="flex justify-center pt-4">
+        <div className="flex flex-col sm:flex-row justify-center pt-4 gap-4">
           <Button 
-            onClick={handleGeneratePlan}
-            className="px-8 py-6 text-lg bg-studbud-500 hover:bg-studbud-600 animate-pulse-slow"
-            disabled={subjects.length === 0 || timeSlots.length === 0}
+            onClick={() => handleGeneratePlan(true)}
+            className="px-6 py-6 text-lg bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg"
+            disabled={subjects.length === 0 || timeSlots.length === 0 || isGeneratingPlan}
           >
-            <Sparkles className="h-5 w-5 mr-2" /> Generate My Study Plan
+            <Cpu className="h-5 w-5 mr-2" /> 
+            {isGeneratingPlan ? "Generating..." : "Generate AI Study Plan"}
+          </Button>
+          
+          <Button 
+            onClick={() => handleGeneratePlan(false)}
+            className="px-6 py-6 text-lg bg-studbud-500 hover:bg-studbud-600"
+            disabled={subjects.length === 0 || timeSlots.length === 0 || isGeneratingPlan}
+          >
+            <Sparkles className="h-5 w-5 mr-2" /> Generate Basic Study Plan
           </Button>
         </div>
       </div>

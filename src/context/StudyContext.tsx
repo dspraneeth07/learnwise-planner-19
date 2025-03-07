@@ -1,5 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { generateAIStudyPlan } from '@/services/geminiService';
+import { toast } from 'sonner';
 
 export type StudyGoal = 'exam' | 'skill' | 'daily' | 'custom';
 export type DifficultyLevel = 'easy' | 'moderate' | 'easyToModerate' | 'aboveModerate' | 'tough';
@@ -40,6 +42,8 @@ interface StudyContextType {
   removeTimeSlot: (id: string) => void;
   studyPlan: StudySession[];
   generateStudyPlan: () => void;
+  generateAIPlan: () => Promise<void>;
+  isGeneratingPlan: boolean;
   clearStudyPlan: () => void;
   resetAll: () => void;
 }
@@ -84,6 +88,8 @@ export const StudyProvider: React.FC<StudyProviderProps> = ({ children }) => {
     const saved = localStorage.getItem('studyPlan');
     return saved ? JSON.parse(saved) : [];
   });
+
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState<boolean>(false);
 
   // Save to localStorage whenever state changes
   useEffect(() => {
@@ -203,6 +209,35 @@ export const StudyProvider: React.FC<StudyProviderProps> = ({ children }) => {
     setStudyPlan(newStudyPlan);
   };
 
+  // Generate study plan using the AI
+  const generateAIPlan = async () => {
+    if (subjects.length === 0 || timeSlots.length === 0) {
+      toast.error("Please add at least one subject and time slot");
+      return;
+    }
+
+    setIsGeneratingPlan(true);
+    toast.info("Generating AI study plan...");
+
+    try {
+      const aiPlan = await generateAIStudyPlan(goal, goalDetails, subjects, timeSlots);
+      
+      if (aiPlan.length > 0) {
+        setStudyPlan(aiPlan);
+        toast.success("AI study plan generated successfully");
+      } else {
+        toast.error("Failed to generate AI plan, using built-in algorithm instead");
+        generateStudyPlan();
+      }
+    } catch (error) {
+      console.error("Error generating AI plan:", error);
+      toast.error("Error generating AI plan, using built-in algorithm instead");
+      generateStudyPlan();
+    } finally {
+      setIsGeneratingPlan(false);
+    }
+  };
+
   const clearStudyPlan = () => {
     setStudyPlan([]);
   };
@@ -231,6 +266,8 @@ export const StudyProvider: React.FC<StudyProviderProps> = ({ children }) => {
         removeTimeSlot,
         studyPlan,
         generateStudyPlan,
+        generateAIPlan,
+        isGeneratingPlan,
         clearStudyPlan,
         resetAll
       }}
