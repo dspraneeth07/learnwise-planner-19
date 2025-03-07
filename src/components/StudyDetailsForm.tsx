@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Clock, BookOpen, Sparkles, Cpu } from 'lucide-react';
+import { Plus, Trash2, Clock, BookOpen, Sparkles, Cpu, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStudyContext, Subject, TimeSlot, DifficultyLevel, StudyGoal } from '@/context/StudyContext';
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,8 @@ const StudyDetailsForm: React.FC = () => {
     endTime: '10:30'
   });
 
+  const [timeError, setTimeError] = useState<string | null>(null);
+
   const handleAddSubject = () => {
     if (!newSubject.name.trim()) {
       toast.error("Please enter a subject name");
@@ -60,21 +63,76 @@ const StudyDetailsForm: React.FC = () => {
     toast.success("Subject added successfully");
   };
 
+  const validateTimeFormat = (time: string): boolean => {
+    return /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time);
+  };
+
+  const formatTimeInput = (time: string): string => {
+    // If time is in the format H:MM, convert to HH:MM
+    if (/^[0-9]:[0-5][0-9]$/.test(time)) {
+      return `0${time}`;
+    }
+    return time;
+  };
+
+  const handleTimeInputChange = (field: 'startTime' | 'endTime', value: string) => {
+    // Validate and format the time input
+    const formattedTime = formatTimeInput(value);
+    
+    setNewTimeSlot({
+      ...newTimeSlot,
+      [field]: formattedTime
+    });
+    
+    // Clear any previous errors
+    setTimeError(null);
+  };
+
   const handleAddTimeSlot = () => {
-    // Validate time format and order
-    const startMinutes = timeToMinutes(newTimeSlot.startTime);
-    const endMinutes = timeToMinutes(newTimeSlot.endTime);
+    // Format times to ensure HH:MM format
+    const formattedStartTime = formatTimeInput(newTimeSlot.startTime);
+    const formattedEndTime = formatTimeInput(newTimeSlot.endTime);
+    
+    // Validate time format
+    if (!validateTimeFormat(formattedStartTime) || !validateTimeFormat(formattedEndTime)) {
+      setTimeError("Please enter valid times in HH:MM format");
+      return;
+    }
+    
+    // Validate time order
+    const startMinutes = timeToMinutes(formattedStartTime);
+    const endMinutes = timeToMinutes(formattedEndTime);
     
     if (endMinutes <= startMinutes) {
-      toast.error("End time must be after start time");
+      setTimeError("End time must be after start time");
       return;
+    }
+
+    // Check for overlapping time slots on the same day
+    const hasOverlap = timeSlots.some(slot => {
+      if (slot.day !== newTimeSlot.day) return false;
+      
+      const slotStartMinutes = timeToMinutes(slot.startTime);
+      const slotEndMinutes = timeToMinutes(slot.endTime);
+      
+      return (
+        (startMinutes >= slotStartMinutes && startMinutes < slotEndMinutes) ||
+        (endMinutes > slotStartMinutes && endMinutes <= slotEndMinutes) ||
+        (startMinutes <= slotStartMinutes && endMinutes >= slotEndMinutes)
+      );
+    });
+    
+    if (hasOverlap) {
+      toast.warning("This time slot overlaps with an existing one", {
+        description: "You may still add it, but consider adjusting the time."
+      });
     }
 
     addTimeSlot({
       id: `timeslot-${Math.random().toString(36).substr(2, 9)}`,
       day: newTimeSlot.day,
-      startTime: newTimeSlot.startTime,
-      endTime: newTimeSlot.endTime
+      startTime: formattedStartTime,
+      endTime: formattedEndTime
     });
 
     toast.success("Time slot added successfully");
@@ -281,8 +339,9 @@ const StudyDetailsForm: React.FC = () => {
                 <Input
                   type="time"
                   value={newTimeSlot.startTime}
-                  onChange={(e) => setNewTimeSlot({...newTimeSlot, startTime: e.target.value})}
-                  className="w-full"
+                  onChange={(e) => handleTimeInputChange('startTime', e.target.value)}
+                  className={cn("w-full", timeError && "border-red-300")}
+                  placeholder="09:00"
                 />
               </div>
               <div>
@@ -292,17 +351,24 @@ const StudyDetailsForm: React.FC = () => {
                 <Input
                   type="time"
                   value={newTimeSlot.endTime}
-                  onChange={(e) => setNewTimeSlot({...newTimeSlot, endTime: e.target.value})}
-                  className="w-full"
+                  onChange={(e) => handleTimeInputChange('endTime', e.target.value)}
+                  className={cn("w-full", timeError && "border-red-300")}
+                  placeholder="10:30"
                 />
               </div>
-              <div className="flex items-end">
+              <div className="flex flex-col justify-end">
                 <Button 
                   onClick={handleAddTimeSlot}
                   className="w-full bg-studbud-500 hover:bg-studbud-600"
                 >
                   <Plus className="h-4 w-4 mr-2" /> Add Time Slot
                 </Button>
+                {timeError && (
+                  <p className="text-red-500 text-xs mt-1 flex items-center">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    {timeError}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -317,7 +383,7 @@ const StudyDetailsForm: React.FC = () => {
                   {timeSlots.map((slot) => (
                     <div 
                       key={slot.id}
-                      className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg"
+                      className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                     >
                       <div>
                         <span className="font-medium">{slot.day}</span>
